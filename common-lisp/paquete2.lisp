@@ -73,8 +73,6 @@
 (ultimo-elemento '( 2 4 6 8 PI #\A))
 (ultimo-elemento '())
 
-
-
 ;6
 (defun conteo (lista)
   (let ((resultado '()) 
@@ -117,6 +115,7 @@
 (aplana '(A B C (D E) (#\1 #\Space) H T (J K (L (M (NIL -7))))))
 (aplana '((T NIL) ((NIL '()))))
 (length nil)
+
 ;8
 (defun diagonal (lista)
   (let ((diagonal '())
