@@ -91,30 +91,33 @@
 (conteo '(A B C))
 
 ;7
-
 (defun aplana (lista)
-  (let ((resultado '()))
-    (dolist (elemento lista resultado)
-      (cond ( (listp elemento )
-	    (setq resultado (append resultado (aplana elemento))))
-	    (T (setq resultado (append resultado (list elemento)))))))) 
+  (let ((listaAplanada '())
+	(pila (list (cons lista (list 0))))
+	(tope 0)
+	(sublista nil)
+	(indice)
+	(elemento)
+	(longitudSublista))
+    (do ()
+	((= tope -1) listaAplanada)
+      (setq sublista (first (nth tope pila)))
+      (setq indice (second (nth tope pila)))
+      (setq longitudSublista (length sublista))
+      (setq elemento (nth indice sublista))
+      (cond ((= indice longitudSublista) 
+	     (setq pila (delete (nth tope pila) pila)) 
+	     (setq tope (1- tope)))
+	    ((and (listp elemento) (> (length elemento) 0))
+	     (setf (second (nth tope pila)) (1+ indice))
+	     (setq pila (append pila (list (cons elemento (list 0)))))
+	     (setq tope (1+ tope)))
+	    (T (setf (second (nth tope pila)) (1+ indice))
+	       (setq listaAplanada (append listaAplanada (list elemento))))))))
 
-(defun aplana (lista) 
-  (let ((resultado '())
-	(elemento))
-    (do ((n 0 (1+ n)))
-	((= n (length lista)) resultado)
-      (setq elemento (nth n lista))
-      (cond ((atom elemento)
-	     (setq resultado (append resultado (list elemento))))
-	    (T
-	     (setq resultado (append resultado (aplana elemento))))))))
-
-(trace aplana)
 (aplana '(A B C (D E) (F (0 -1)) H I (J K (L (M (7 -7))))))
 (aplana '(A B C (D E) (#\1 #\Space) H T (J K (L (M (NIL -7))))))
-(aplana '((T NIL) ((NIL '()))))
-(length nil)
+(aplana '((T NIL) ((NIL ()))))
 
 ;8
 (defun diagonal (lista)
@@ -127,12 +130,18 @@
 
 (diagonal '((A B C) (4 5 6) (NIL T NIL)))
 
-;9---Checar
+;9
+(defun primer-nivel (lista)
+  (let ((resultado '()))
+    (dolist (elemento lista resultado)
+      (cond ((and (listp elemento) (> (length elemento) 0))
+	     (setq resultado (append resultado (list 'L))))
+	    ((and (listp elemento) (= (length elemento) 0))
+	     (setq resultado (append resultado (list 'N))))
+	    (T (setq resultado (append resultado (list 'A))))))))
 
-(primer-nivel '((#\A #\B) C D E (7 -1) NIL '()))
+(primer-nivel '((#\A #\B) C D E (7 -1) NIL ()))
 
-(atom ())
-(null nil)
 ;10
 (defun suma-numerica (lista)
   (let ((sumaNumerica 0))
@@ -147,7 +156,7 @@
   (let ((listaSinVocales '())
 	(vocales '(#\A #\a #\E #\e #\I #\i #\O #\o #\U #\u )))
     (dolist (elemento lista listaSinVocales)
-      (cond ((listp elemento)
+      (cond ((and (listp elemento) (> (length elemento) 0))
 	     (setq listaSinVocales (append listaSinVocales (list (filtra-vocales elemento)))))
 	    ((characterp elemento)
 	     (if (not (numberp (position elemento vocales)))
@@ -167,15 +176,50 @@
 (filtra-multiplos '(10 5 2 4 6 8 -1 -6 -5 -1 0 50 11 13 2 7 4 -7) 2)
 
 ;13
-(defun celdas (lista)
-  (let ((numeroDeCeldas (length lista)))
-    (dolist (elemento lista numeroDeCeldas)
-      (if (listp elemento)
-	  (setq numeroDeCeldas (+ numeroDeCeldas (celdas elemento)))))))
+(defun numero-celdas (lista)
+  (let ((cantidadCeldas (length lista))
+	(pila (list (cons lista (list 0))))
+	(tope 0)
+	(sublista nil)
+	(indice)
+	(elemento)
+	(longitudSublista))
+    (do ()
+	((= tope -1) cantidadCeldas)
+      (setq sublista (first (nth tope pila)))
+      (setq indice (second (nth tope pila)))
+      (setq longitudSublista (length sublista))
+      (setq elemento (nth indice sublista))
+      (cond ((= indice longitudSublista) 
+	     (setq pila (delete (nth tope pila) pila)) 
+	     (setq tope (1- tope)))
+	    ((and (listp elemento) (> (length elemento) 0))
+	     (setf (second (nth tope pila)) (1+ indice))
+	     (setq pila (append pila (list (cons elemento (list 0)))))
+	     (setq tope (1+ tope))
+	     (setq cantidadCeldas (+ cantidadCeldas (length elemento))))
+	    (T (setf (second (nth tope pila)) (1+ indice)))))))
 
-(celdas '( (ROJO AZUL) AMARILLO (VERDE GRIS) () (1 2 (3 4 (5 6 ())))))
+(numero-celdas '( (ROJO AZUL) AMARILLO (VERDE GRIS) () (1 2 (3 4 (5 6 ()))))) ;18 celdas
+(numero-celdas '( (ROJO AZUL (#\1 #\2 #\3 (C))) AMARILLO (VERDE GRIS) () (1 2 (3 4 (5 6 ())))));24
+(numero-celdas '(A (B C)))
 
 ;14 ?
+(defun implica (&rest args)
+  (cond ((< (length args) 2)
+	 (print "Esta funcion requiere al menos 2 argumentos"))
+	(T
+	 (let ((p (first args))
+	       (q (second args))
+	       (resto (rest (rest args))))
+	   (do ((pimplicaq (or (or (and p q) (and (not p) q) (and (not p) (not q))) NIL)
+			   (or (or (and p q) (and (not p) q) (and (not p) (not q))) NIL)))
+	       ((null resto) pimplicaq)
+	     (setq p pimplicaq)
+	     (setq q (first resto))
+	     (setq resto (rest resto)))))))
+
+(implica nil t nil t nil t t)
 
 ;15
 (defun Mult (A B)
