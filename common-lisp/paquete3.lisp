@@ -156,6 +156,7 @@
 
 (defun suma-numerica (lista)
   (suma-numerica-aux lista 0))
+
 (suma-numerica '(5 -1 50 -20 8 7 A B C -1 3 5 9 10))
 
 ;11
@@ -221,6 +222,28 @@
 (implica nil t nil t nil t nil)
  
 ;15
+(defun multiplica-renglon (renglonA matrizB)
+  (let ((renglon '())
+	(suma 0))
+    (dotimes (j (length (first matrizB)) renglon)
+      (setq suma 0)
+      (dotimes (i (length renglonA))
+	(setq suma (+ suma (* (nth i renglonA) (nth j (nth i matrizB))))))
+      (setq renglon (append renglon (list suma))))))
+
+(defun multiplica-aux (a b resultado)
+  (cond ((null a) resultado)
+	(T (setq resultado (append resultado (list (multiplica-renglon (first a) b))))
+	   (multiplica-aux (rest a) b resultado))))
+
+(defun multiplica (a b)
+  (cond ((/= (length (first a)) (length b)) "Las matrices no son apropiadas")
+	(T (multiplica-aux a b '()))))
+
+(multiplica '((1 1) (1 1)) '((1 1 1) (1 1 1)))
+(multiplica '((1 5) (1 1) (1 1) (1 1)) '((1 1 1 1) (1 1 1 1)))
+(multiplica '((1 0 0)(0 1 0)(0 0 1)) '((1 1 1)(1 1 1)(1 1 1)))
+(multiplica '((1 1) (1 1)) '((1 1)))
 
 ;16
 (defun cambia-aux (lista elem1 elem2 resultado)
@@ -234,17 +257,106 @@
 
 (cambia '(A B C) 'B 0)
 
-;17
+;17 ?
+(defun fib1 (n)
+  (check-type n (integer 0 *))
+  (if (< n 2) n
+      (+ (fib1 (1- n)) (fib1 (- n 2)))))
 
-;18
-(defun mapeo-aux (funcion resultadoAnterior resto)
-  (cond ((null resto) resultadoAnterior)
-	))
+(defun fib2 (n)
+  (check-type n (integer 0 *))
+  (labels ((fib2-aux (n f1 f2)
+	     (if (zerop n) 
+		 f1
+		 (fib2-aux (1- n) f2 (+ f1 f2)))))
+    (fib2-aux n 0 1)))
 
-(defun mapeo (&rest args)
-  (cond ((< (length args) 2) "Los argumentos de la funcion deben ser al menos 2")
-	((not (functionp (first args))) "El primer argumento debe ser una funcion")
-	(T (mapeo-aux (first args) (second args) (rest (rest args))))))
+
+(defun fib3 (n)
+  (check-type n (integer 0 *))
+   (loop for f1 = 0 then f2
+	 and f2 = 1 then (+ f1 f2)
+	 repeat n finally (return f1)))
+
+(defun fib4 (n)
+  (check-type n (integer 0 *))
+  (do ((i n (1- i))
+       (f1 0 f2)
+       (f2 1 (+ f1 f2)))
+      ((= i 0) f1)))
+
+(defun fib5 (n)
+  (check-type n (integer 0 *))
+  (labels ((fib5-aux (n k)
+	     (if (zerop n) 
+		 (funcall k 0 1)
+		 (fib5-aux (1- n) (lambda (x y)
+				    (funcall k y (+ x y)))))))
+    (fib5-aux n #'(lambda (a b) a))))
+
+(defun fib6 (n)
+  (labels ((fib6-aux (n)
+	     (cond ((= n 0) (values 1 0))
+		   (T
+		    (multiple-value-bind (val prev-val)
+			(fib6-aux (- n 1))
+		      (values (+ val prev-val)
+			      val))))))
+    (nth-value 0 (fib6-aux n))))
+
+(defun fib7 (n)
+  (check-type n (integer 0 *))
+  (labels ((fib7-aux (a b p q count)
+	     (cond ((= count 0) b)
+		   ((evenp count)
+		    (fib7-aux a
+			      b
+			      (+ (* p p) (* q q))
+			      (+ (* q q) (* 2 p q))
+			      (/ count 2)))
+		   (t (fib7-aux (+ (* b q) (* a q) (* a p))
+				(+ (* b p) (* a q))
+				p
+				q
+				(- count 1))))))
+    (fib7-aux 1 0 0 1 n)))
+
+(defun fib8 (n)
+  (if (< n 2) n
+      (if (oddp n) 
+	  (let ((k (/ (1+ n) 2)))
+	    (+ (expt (fib8 k) 2) (expt (fib8 (1- k)) 2)))
+	  (let* ((k (/ n 2)) (fk (fib8 k)))
+	    (* (+ (* 2 (fib8 (1- k))) fk) fk)))))
+
+(time (fib1 50))
+(time (fib2 50))
+(time (fib3 50))
+(time (fib4 50))
+(time (fib5 50))
+(time (fib6 50))
+(time (fib7 50))
+(time (fib8 50))
+;18 ?
+(defun mapea-aux (funcion lista1 lista2 mas-listas)
+  (let ((resultado '()))
+    (cond ((or (null lista1) (null lista2)) nil)
+	  (T
+	   (do ((i 0 (1+ i)))
+	       ((or (= i (length lista1)) (= i (length lista2))))
+	     (setq resultado (append resultado (list (funcall funcion (nth i lista1) (nth i lista2))))))
+	   (if (null mas-listas)
+	       resultado
+	       (mapea-aux funcion resultado (first mas-listas) (rest mas-listas)))))))
+
+(defun mapea (funcion lista &rest mas-listas)
+  (cond ((null mas-listas) lista)
+	(T (mapea-aux funcion lista (first mas-listas) (rest mas-listas)))))
+
+(mapea #'append '((1 2 -1)) '((3 A (NIL) (B C (#\0)))) '((T)))
+(mapea #'+ '(1 2 -1) '(3 4 5 6) '(-3 5 -1 2))
+(mapea #'+ '(1 2 -1) '(3 4 5 6) '())
+(mapea #'(lambda (x y) (list x y)) '(1 2 -1) '(3 4 5 6))
 
 ;19 Aplana, escrito en el ejercicio 9.
 
@@ -274,25 +386,38 @@
 
 ;22
 (defun qs (lista a b)
-  (let ((i (1+ a)) (j b) (pivote (nth a lista)) (izquerdo) (derecho))
-    (cond ((<= b a) lista) 
-	  ((null lista) nil)
-	  ((not (numberp pivote)) (cons pivote (qs (rest lista) 0 b)))
-	  (T (do () ((i = j))
-	       (setq izquerdo (nth i lista))
-	       (setq derecho (nth j lista))
-	       (cond ((and (numberp izquierdo) (numberp derecho) (>= izquierdo pivote) (<= derecho pivote))
-		      (setf (nth i lista) derecho)
-		      (setf (nth j lista) izquierdo) (1+ i) (1- j))
-		     ((and (numberp izquerdo) (<= izquierdo pivote)) (1+ i))
-		     ((and (numberp derecho) (>= derecho pivote) (1- j)))))
-	     (if (and (numberp (nth i lista)) (numberp (nth j lista))) 
-		 (setq i (1- i)))
-	     (setf (nth a lista) (nth i lista))
-	     (setf (nth i lista) pivote)
-	     (qs lista a (1- i))
-	     (qs lista (1+ i) b)))))
+  (if (not (<= b a))
+      (let ((pivote (nth a lista)) (i (+ a 1)) (j b))
+	(do ((tmp 0))
+	    ((>= i j))
+	  (cond ((and (> (nth i lista) pivote) (<= (nth j lista) pivote))
+		 (setq tmp (nth i lista))
+		 (setf (nth i lista) (nth j lista))
+		 (setf (nth j lista) tmp)
+		 (setq i (1+ i))
+		 (setq j (1- j)))
+		((<= (nth i lista) pivote) (setq i (1+ i)))
+		(T (setq j (1- j)))))
+	(if (> (nth i lista) pivote)
+	    (setq i (1- i)))
+	(setf (nth a lista) (nth i lista))
+	(setf (nth i lista) pivote)
+	(qs lista a (1- i))
+	(qs lista (1+ i) b))))
 
 (defun quick-sort (lista)
-  (qs lista 0 (1- (length lista))))
+  (cond ((null lista) nil)
+	(T
+	 (let ((listaDeNumeros '()))
+	   (dolist (elem lista)
+	     (if (numberp elem) 
+		 (setq listaDeNumeros (append listaDeNumeros (list elem)))))
+	   (qs listaDeNumeros 0 (1- (length listaDeNumeros)))
+	   (dotimes (i (length lista) lista)
+	     (cond ((numberp (nth i lista))
+		    (setf (nth i lista) (first listaDeNumeros))
+		    (setq listaDeNumeros (rest listaDeNumeros)))))))))
 
+(quick-sort '(5 6 A 3 5 B 2 1 8 9))
+(quick-sort '(5 6 A 3 5 B 2 1 -50 -1 0 9 7 (NIL (T))))
+(quick-sort '(5 -1 A 3 5 (B (NIL)) 2 1 8 9))
