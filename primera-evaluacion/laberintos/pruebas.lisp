@@ -8,8 +8,10 @@
 ;;; 
 ;;; Hernandez Escudero Luis Hugo
 (load "maze_lib.lisp")
+(quicklisp:quickload 'cl-heap)
 
 (defparameter *frontera* nil)
+(defparameter *frontera_con_prioridad* nil)
 (defparameter *solucion* nil)
 (defparameter *memoria* nil)
 (defparameter *ancestro_actual* nil)
@@ -36,9 +38,9 @@
 (defun agregar-a-frontera (estado operador metodo &optional (aptitud))
   (let ((nodo (crear-nodo estado operador aptitud)))
     (cond ((eql metodo :busqueda-en-profundidad)
-	   (push nodo *frontera*))
+	   (cl-heap:enqueue *frontera_con_prioridad* nodo aptitud))
 	  ((eql metodo :sin-orden)
-	   (push nodo *frontera*)))))
+	   (cl-heap:enqueue *frontera_con_prioridad* nodo aptitud)))))
 
 (defun sacar-de-frontera ()
   (pop *frontera*))
@@ -139,18 +141,21 @@
 	(setq descendientes (cons (list nuevo_estado operador) descendientes))))))
 
 ;;; Verifica si un [estado] ya se encuentra en la lista de [memoria]
+;;; La lista de memoria contiene los nodos del arbol por los que ya se 
+;;; ha pasado, en cada nodo hay un estado asociado, el cual se compara
+;;; con el estado que se pasa como argumento a esta funcion
 (defun estado-recordado? ( estado memoria )
   (cond ((null memoria) nil)
 	((equalp estado (second (first memoria))) T)
 	(T (estado-recordado? estado (rest memoria)))))
 
-;;; Filtra los estados, al descartar aquellos que ya se encuentran en la lista de memoria.
-(defun filtrar-estados-recordados (estados-y-operadores)
+;;; Filtra los estados, al descartar aquellos por los que ya se ha pasado
+(defun filtrar-estados (estados-y-operadores)
   (cond ((null estados-y-operadores) nil)
 	((estado-recordado? (first (first estados-y-operadores)) *memoria*)
-	 (filtrar-estados-recordados (rest estados-y-operadores)))
+	 (filtrar-estados (rest estados-y-operadores)))
 	(T 
-	 (cons (first estados-y-operadores) (filtrar-estados-recordados (rest estados-y-operadores))))))
+	 (cons (first estados-y-operadores) (filtrar-estados (rest estados-y-operadores))))))
 
 ;;; Extrae la solucion del problema a partir del nodo con el estado meta
 ;;; rastreando los nodos ancestros.
@@ -175,6 +180,7 @@
 
 (defun inicializar ()
   (setq *frontera* nil)
+  (setq *frontera_con_prioridad* (make-instance 'cl-heap:priority-queue))
   (setq *memoria* nil)
   (setq *id* 0)
   (setq *ancestro_actual* nil)
@@ -206,51 +212,9 @@
 		 (setq meta_encontrada t))
 		(T (setq *ancestro_actual* (first nodo))
 		   (setq sucesores (expandir-estado estado))
-		   (setq sucesores (filtrar-estados-recordados sucesores))
+		   (setq sucesores (filtrar-estados sucesores))
 		   (loop for sucesor in sucesores do
 			 (agregar-a-frontera (first sucesor) (second sucesor) ':busqueda-en-profundidad)))))))
-
-
-;;; Esta funcion retorna el nodo con mejor evaluacion, ya sea aptitud para el algoritmo
-;;; best-first-search o costo real para el algoritmo a-estrella.
-
-;;; La mejor evaluacion para best-first-search es la menor aptitud, es decir, el nodo con 
-;;; el estado mas proximo al estado meta.
-;;;
-;;; La mejor evaluacion para a-estrella es el menor costo real, es decir, el nodo con el estado
-;;; mas proximo al estado meta y con un menor numero de operaciones necesarias para llegar a el.
-
-;;; Cabe mencionar que esta funcion se podria sustituir si se usara una cola con prioridad
-(defun sacar-nodo-con-mejor-evaluacion ()
-  (let ((menor nil)
-	(nodo nil))
-    (dotimes (i (length *frontera*) menor)
-      (setq nodo (nth i *frontera*))
-      (cond ((= i 0)
-	     (setq menor nodo))
-	    ((< (nth 4 nodo) (nth 4 menor))
-	     (setq menor nodo))))))
-
-;;; Busca el [estado] en la [frontera], en caso de encontrarlo regresa el nodo que
-;;; lo contiene, si no lo encuentra devuelve nil.
-;;; Esta funcion es utilizada por el filtro para el algoritmo de mejor-aptitud y
-;;; por el filtro para el algoritmo a-estrella
-(defun estado-en-frontera? ( estado frontera )
-  (cond ((null frontera) nil)
-	((equalp estado (second (first frontera))) 
-	 (first frontera))
-	(T
-	 (estado-en-frontera? estado (rest frontera)))))
-
-;;; Filtra los estados, al descartar aquellos que ya se encuentran en la frontera de busqueda o en la 
-;;; lista de memoria
-(defun filtro-mejor-aptitud ( estados-y-operadores )
-  (cond ((null estados-y-operadores) nil)
-	((or (estado-recordado? (first (first estados-y-operadores)) *memoria*) 
-	     (not (null (estado-en-frontera? (first (first estados-y-operadores)) *frontera*))))
-	 (filtro-mejor-aptitud (rest estados-y-operadores)))
-	(T
-	 (cons (first estados-y-operadores) (filtro-mejor-aptitud (rest estados-y-operadores))))))
 
 ;;; Calcula la aptitud de un estado, considerando la distancia manhatan 
 ;;; entre la posicion del [estado] y la posicion del [estado_meta].
@@ -259,7 +223,7 @@
 	(yi (aref estado 1)))
     (+ (abs (- xi *xMeta*)) (abs (- yi *yMeta*)))))
 
-(defun mejor-aptitud()
+(defun mejor-aptitud ()
   (inicializar)
   (let ((nodo nil)
 	(estado nil)
@@ -271,70 +235,25 @@
     (setq *xMeta* (aref *goal* 0))
     (setq *yMeta* (aref *goal* 1))
     (agregar-a-frontera *start* nil ':sin-orden 0)
-    (loop until (or meta_encontrada (null *frontera*)) do
-	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
+    (loop until (or meta_encontrada (= (cl-heap:queue-size *frontera_con_prioridad*) 0)) do
+	  (setq nodo (cl-heap:dequeue *frontera_con_prioridad*))
 	  (setq estado (second nodo))
 	  (setq operador (third nodo))
-	  (setq *frontera* (delete nodo *frontera*))
 	  (push nodo *memoria*)
 	  (cond ((equalp estado *goal*) 
 		 (setq solucion (crear-lista-movimientos (extraer-solucion nodo)))
 		 (setq *solution* solucion)
-		 (print (length solucion))
+		 (print solucion)
 		 (setq meta_encontrada t))
 		(T (setq *ancestro_actual* (first nodo))
 		   (setq sucesores (expandir-estado estado))
-		   (setq sucesores (filtro-mejor-aptitud sucesores))
+		   (setq sucesores (filtrar-estados sucesores))
 		   (loop for sucesor in sucesores do
 			 (setq aptitud (calcular-aptitud (first sucesor)))
 			 (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden aptitud)))))))
-;(mejor-aptitud)
-;;; Si existe un nodo en la frontera de busauqeda con el mismo estado que el [estado] argumento
-;;; verifica cual tiene mejor costo_real.
-;;;
-;;; En caso de que no exista el nodo, se regresa t, que indica que es posible agregarlo a la frontera.
 
-;;; En caso de que exista el nodo, se verifica cual tiene mejor costo, si el nuevo estado tiene mejor costo se elimina el
-;;; nodo de la frontera y se devuelve t, que denota que el nuevo estado puede agregarse.
-
-;;; En caso de que no tenga mejor costo, se deja el nodo de la frontera y se descarta el nuevo estado.
-(defun pasa-filtro-a-estrella? ( estado costo_real )
-  (let* ((nodo (estado-en-frontera? estado *frontera*)))
-    (cond ((null nodo) t) 
-	  ((< costo_real (fifth nodo))
-	   (setq *frontera* (delete nodo *frontera*))
-	   t)
-	  (T nil))))
-
-(defun a-estrella()
-  (inicializar)
-  (let ((nodo nil)
-	(estado nil)
-	(sucesores nil)
-	(operador nil)
-	(meta_encontrada nil)
-	(solucion nil)
-	(costo_real nil))
-    (setq *xMeta* (aref *goal* 0))
-    (setq *yMeta* (aref *goal* 1))
-    (agregar-a-frontera *start* nil ':sin-orden 0)
-    (loop until (or meta_encontrada (null *frontera*)) do
-	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
-	  (setq estado (second nodo))
-	  (setq operador (third nodo))
-	  (setq *frontera* (delete nodo *frontera*))
-	  (push nodo *memoria*)
-	  (cond ((equalp estado *goal*) 
-		 (setq solucion (crear-lista-movimientos (extraer-solucion nodo)))
-		 (setq *solution* solucion)
-		 (print (length solucion))
-		 (setq meta_encontrada t))
-		(T (setq *ancestro_actual* (first nodo))
-		   (setq sucesores (expandir-estado estado))
-		   (setq sucesores (filtrar-estados-recordados sucesores))
-		   (loop for sucesor in sucesores do
-			 (setq costo_real (+ *ancestro_actual* (calcular-aptitud (first sucesor))))
-			 (if (pasa-filtro-a-estrella? (first sucesor) costo_real)
-			     (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden costo_real))))))))
-;(a-estrella)
+(defparameter tiempo (get-internal-run-time))
+(mejor-aptitud)
+(setq tiempo (- (get-internal-run-time) tiempo))
+(print tiempo)
 (start-maze)
