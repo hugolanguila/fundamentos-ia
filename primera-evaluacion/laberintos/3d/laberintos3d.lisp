@@ -225,8 +225,7 @@
 	(estado_inicial (make-array '(3) :initial-contents (list (aref *start* 0) (aref *start* 1) 0)))
 	(estado_meta (make-array '(3) :initial-contents (list (aref *goal* 0) (aref *goal* 1) 0)))
 	(meta_encontrada nil)
-	(solucion nil)
-	(i 0))
+	(solucion nil))
     (agregar-a-frontera estado_inicial nil ':busqueda-en-profundidad)
     (loop until (or meta_encontrada (null *frontera*)) do
 	  (setq nodo (sacar-de-frontera))
@@ -242,5 +241,138 @@
 		   (setq sucesores (filtrar-estados-recordados sucesores))
 		   (loop for sucesor in sucesores do
 			 (agregar-a-frontera (first sucesor) (second sucesor) ':busqueda-en-profundidad)))))))
+
+
+;;; Esta funcion retorna el nodo con mejor evaluacion, ya sea aptitud para el algoritmo
+;;; best-first-search o costo real para el algoritmo a-estrella.
+
+;;; La mejor evaluacion para best-first-search es la menor aptitud, es decir, el nodo con 
+;;; el estado mas proximo al estado meta.
+;;;
+;;; La mejor evaluacion para a-estrella es el menor costo real, es decir, el nodo con el estado
+;;; mas proximo al estado meta y con un menor numero de operaciones necesarias para llegar a el.
+
+;;; Cabe mencionar que esta funcion se podria sustituir si se usara una cola con prioridad
+(defun sacar-nodo-con-mejor-evaluacion ()
+  (let ((menor nil)
+	(nodo nil))
+    (dotimes (i (length *frontera*) menor)
+      (setq nodo (nth i *frontera*))
+      (cond ((= i 0)
+	     (setq menor nodo))
+	    ((< (nth 4 nodo) (nth 4 menor))
+	     (setq menor nodo))))))
+
+;;; Busca el [estado] en la [frontera], en caso de encontrarlo regresa el nodo que
+;;; lo contiene, si no lo encuentra devuelve nil.
+;;; Esta funcion es utilizada por el filtro para el algoritmo de mejor-aptitud y
+;;; por el filtro para el algoritmo a-estrella
+(defun estado-en-frontera? ( estado frontera )
+  (cond ((null frontera) nil)
+	((equalp estado (second (first frontera))) 
+	 (first frontera))
+	(T
+	 (estado-en-frontera? estado (rest frontera)))))
+
+;;; Filtra los estados, al descartar aquellos que ya se encuentran en la frontera de busqueda o en la 
+;;; lista de memoria
+(defun filtro-mejor-aptitud ( estados-y-operadores )
+  (cond ((null estados-y-operadores) nil)
+	((or (estado-recordado? (first (first estados-y-operadores)) *memoria*) 
+	     (not (null (estado-en-frontera? (first (first estados-y-operadores)) *frontera*))))
+	 (filtro-mejor-aptitud (rest estados-y-operadores)))
+	(T
+	 (cons (first estados-y-operadores) (filtro-mejor-aptitud (rest estados-y-operadores))))))
+
+;;; Calcula la aptitud de un estado, considerando la distancia manhatan 
+;;; entre la posicion del [estado] y la posicion del [estado_meta].
+(defun calcular-aptitud (estado)
+  (let ((xi (aref estado 0))
+	(yi (aref estado 1)))
+    (+ (abs (- xi *xMeta*)) (abs (- yi *yMeta*)))))
+
+(defun mejor-aptitud()
+  (inicializar)
+  (let ((nodo nil)
+	(estado nil)
+	(aptitud nil)
+	(sucesores nil)
+	(operador nil)
+	(meta_encontrada nil)
+	(solucion nil)
+	(estado_inicial (make-array '(3) :initial-contents (list (aref *start* 0) (aref *start* 1) 0)))
+	(estado_meta (make-array '(3) :initial-contents (list (aref *goal* 0) (aref *goal* 1) 0))))
+    (setq *xMeta* (aref *goal* 0))
+    (setq *yMeta* (aref *goal* 1))
+    (agregar-a-frontera estado_inicial nil ':sin-orden 0)
+    (loop until (or meta_encontrada (null *frontera*)) do
+	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
+	  (setq estado (second nodo))
+	  (setq operador (third nodo))
+	  (setq *frontera* (delete nodo *frontera*))
+	  (push nodo *memoria*)
+	  (cond ((equalp estado estado_meta) 
+		 (setq solucion (crear-lista-movimientos (extraer-solucion nodo)))
+		 (setq *solution* solucion)
+		 (print (length solucion))
+		 (setq meta_encontrada t))
+		(T (setq *ancestro_actual* (first nodo))
+		   (setq sucesores (expandir-estado estado))
+		   (setq sucesores (filtro-mejor-aptitud sucesores))
+		   (loop for sucesor in sucesores do
+			 (setq aptitud (calcular-aptitud (first sucesor)))
+			 (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden aptitud)))))))
+
+;(mejor-aptitud)
+;;; Si existe un nodo en la frontera de busauqeda con el mismo estado que el [estado] argumento
+;;; verifica cual tiene mejor costo_real.
+;;;
+;;; En caso de que no exista el nodo, se regresa t, que indica que es posible agregarlo a la frontera.
+
+;;; En caso de que exista el nodo, se verifica cual tiene mejor costo, si el nuevo estado tiene mejor costo se elimina el
+;;; nodo de la frontera y se devuelve t, que denota que el nuevo estado puede agregarse.
+
+;;; En caso de que no tenga mejor costo, se deja el nodo de la frontera y se descarta el nuevo estado.
+(defun pasa-filtro-a-estrella? ( estado costo_real )
+  (let* ((nodo (estado-en-frontera? estado *frontera*)))
+    (cond ((null nodo) t) 
+	  ((< costo_real (fifth nodo))
+	   (setq *frontera* (delete nodo *frontera*))
+	   t)
+	  (T nil))))
+
+(defun a-estrella()
+  (inicializar)
+  (let ((nodo nil)
+	(estado nil)
+	(sucesores nil)
+	(operador nil)
+	(meta_encontrada nil)
+	(solucion nil)
+	(costo_real nil)
+	(estado_inicial (make-array '(3) :initial-contents (list (aref *start* 0) (aref *start* 1) 0)))
+	(estado_meta (make-array '(3) :initial-contents (list (aref *goal* 0) (aref *goal* 1) 0))))
+    (setq *xMeta* (aref *goal* 0))
+    (setq *yMeta* (aref *goal* 1))
+    (agregar-a-frontera estado_inicial nil ':sin-orden 0)
+    (loop until (or meta_encontrada (null *frontera*)) do
+	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
+	  (setq estado (second nodo))
+	  (setq operador (third nodo))
+	  (setq *frontera* (delete nodo *frontera*))
+	  (push nodo *memoria*)
+	  (cond ((equalp estado estado_meta) 
+		 (setq solucion (crear-lista-movimientos (extraer-solucion nodo)))
+		 (setq *solution* solucion)
+		 (print (length solucion))
+		 (setq meta_encontrada t))
+		(T (setq *ancestro_actual* (first nodo))
+		   (setq sucesores (expandir-estado estado))
+		   (setq sucesores (filtrar-estados-recordados sucesores))
+		   (loop for sucesor in sucesores do
+			 (setq costo_real (+ *ancestro_actual* (calcular-aptitud (first sucesor))))
+			 (if (pasa-filtro-a-estrella? (first sucesor) costo_real)
+			     (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden costo_real))))))))
+
 
 (start-maze)
