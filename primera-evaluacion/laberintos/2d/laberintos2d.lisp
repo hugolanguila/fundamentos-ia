@@ -1,4 +1,4 @@
-;;; laberinto2d.lisp
+;;; laberintos2d.lisp
 ;;; Resuelve el problema de encontrar la salida en un laberinto a partir del estado inicial
 ;;; 
 ;;; Representacion de los estados
@@ -26,15 +26,31 @@
 		       (:oeste    6)
 		       (:noroeste 7)))
 
-;;; Crea un nodo
-(defun crear-nodo (estado operador aptitud)
+;;; Los nodos del programa son una lista cuyos elementos son los siguientes.
+;;; id -> Identificador del nodo
+;;; estado -> Arreglo con 2 numeros #(X Y), donde X es la fila & Y es la columna.
+;;; operador -> El operador que se aplico al estado en el nodo ancestro para llegar a este estado
+;;; *ancestro_actual* -> identificador del nodo ancestro a este
+;;; evaluacion -> Puede corresponder a la aptitud del estado o al costo real del estado
+(defun crear-nodo (estado operador evaluacion)
   (incf *id*)
-  (list *id* estado operador *ancestro_actual* aptitud))
+  (list *id* estado operador *ancestro_actual* evaluacion))
 
-;;;
 ;;; agrega un nodo a la frontera de busqueda
-(defun agregar-a-frontera (estado operador metodo &optional (aptitud))
-  (let ((nodo (crear-nodo estado operador aptitud)))
+;;; 
+;;; Para los 3 algoritmos, la forma de agregar un nodo a la frontera de busqueda es la misma, 
+;;; sin embargo, para los algoritmos bfs y a* los nodos deberian insertarse en la posicion cuyo orden sea el correcto.
+;;; 
+;;; Dado que no se esta trabajando con una cola con prioridad en la estructura *frontera*,
+;;; los nodos se insertan sin importar la posicion, pero mas adelante esta la funcion que extrae el nodo con mejor aptitud.
+;;;
+;;; El parametro opcional llamado evaluacion, puede corresponder a dos valores
+;;; Aptitud -> Para el algoritmo best-first-search la aptitud es la distancia manhatan entre el [estado] y 
+;;;            el estado meta
+;;; Costo-real -> Para el algoritmo a*, el costo real denota la aptitud del [estado] + el costo MINIMO con el que
+;;;               se llega a ese [estado]
+(defun agregar-a-frontera (estado operador metodo &optional (evaluacion 0))
+  (let ((nodo (crear-nodo estado operador evaluacion)))
     (cond ((eql metodo :busqueda-en-profundidad)
 	   (push nodo *frontera*))
 	  ((eql metodo :sin-orden)
@@ -104,8 +120,8 @@
 	     (T nil)))
       (T nil))))
 
-;;; Evalua si un [estado] es valido
-;;; al verificar que los indices de la celda actual se encuentran dentro de los rangos del laberinto
+;;; Crea un nuevo estado a partir del [estado] y el [operador]
+;;; El operador determina la posicion del estado a crear.
 (defun aplicar-operador (operador estado)
   (let* ((fila (aref estado 0))
 	 (columna (aref estado 1)))
@@ -186,6 +202,7 @@
 (add-algorithm 'mejor-aptitud)
 (add-algorithm 'a-estrella)
 
+;;; Algoritmo general de busqueda en profundidad
 (defun busqueda-en-profundidad ()
   (inicializar)
   (let ((nodo nil)
@@ -288,6 +305,7 @@
 		   (loop for sucesor in sucesores do
 			 (setq aptitud (calcular-aptitud (first sucesor)))
 			 (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden aptitud)))))))
+
 ;(mejor-aptitud)
 ;;; Si existe un nodo en la frontera de busauqeda con el mismo estado que el [estado] argumento
 ;;; verifica cual tiene mejor costo_real.
@@ -336,5 +354,5 @@
 			 (setq costo_real (+ *ancestro_actual* (calcular-aptitud (first sucesor))))
 			 (if (pasa-filtro-a-estrella? (first sucesor) costo_real)
 			     (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden costo_real))))))))
-;(a-estrella)
+
 (start-maze)
