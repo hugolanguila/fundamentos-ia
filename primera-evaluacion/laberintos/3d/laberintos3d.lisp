@@ -59,11 +59,11 @@
 	      (cond ((= celda_actual 16)
 		     (if (= nivel 1)
 			 nil
-			 (or (= celda_siguiente 17)(not (logbitp 2 celda_siguiente)))))
+			(not (logbitp 2 celda_siguiente))))
 		    ((= celda_actual 17)
 		     (if (= nivel 0)
 			 nil
-			 (or (= celda_siguiente 16) (not (logbitp 2 celda_siguiente)))))
+			 (not (logbitp 2 celda_siguiente))))
 		    (T (and (or (evenp celda_actual) (> celda_actual 15)) (not (logbitp 2 celda_siguiente))))))
 	     (T nil))) 
       (:sur
@@ -72,11 +72,11 @@
 	      (cond ((= celda_actual 16)
 		     (if (= nivel 1)
 			 nil
-			 (or (= celda_siguiente 17) (not (logbitp 0 celda_siguiente)))))
+			 (not (logbitp 0 celda_siguiente))))
 		    ((= celda_actual 17)
 		     (if (= nivel 0)
 			 nil
-			 (or (= celda_siguiente 16) (not (logbitp 0 celda_siguiente)))))
+			 (not (logbitp 0 celda_siguiente))))
 		    (T (and (not (logbitp 2 celda_actual)) (or (evenp celda_siguiente) (> celda_siguiente 15))))))
 	     (T nil)))
       (:este 
@@ -85,11 +85,11 @@
 	      (cond ((= celda_actual 16)
 		     (if (= nivel 0)
 			 nil
-			 (or (= celda_siguiente 17) (not (logbitp 3 celda_siguiente)))))
+			 (not (logbitp 3 celda_siguiente))))
 		    ((= celda_actual 17)
 		     (if (= nivel 1)
 			 nil
-			 (or (= celda_siguiente 16) (not (logbitp 3 celda_siguiente)))))
+			 (not (logbitp 3 celda_siguiente))))
 		    (T (and (not (logbitp 1 celda_actual)) (or (<= celda_siguiente 7) (> celda_siguiente 15)) ))))
 	     (T nil)))
       (:oeste
@@ -98,11 +98,11 @@
 	      (cond ((= celda_actual 16)
 		     (if (= nivel 0)
 			 nil
-			 (or (> celda_siguiente 15) (not (logbitp 1 celda_siguiente)))))
+			 (not (logbitp 1 celda_siguiente))))
 		    ((= celda_actual 17)
 		     (if (= nivel 1)
 			 nil
-			 (or (> celda_siguiente 15) (not (logbitp 1 celda_siguiente)))))
+			 (not (logbitp 1 celda_siguiente))))
 		    (T (and (or (<= celda_actual 7) (> celda_actual 15)) (not (logbitp 1 celda_siguiente))))))
 	     (T nil)))
       (T nil))))
@@ -236,7 +236,6 @@
 	  (cond ((equalp estado estado_meta) 
 		 (setq solucion (crear-lista-movimientos (extraer-solucion nodo)))
 		 (setq *solution* solucion)
-		 (print solucion)
 		 (setq meta_encontrada t))
 		(T (setq *ancestro_actual* (first nodo))
 		   (setq sucesores (expandir-estado estado))
