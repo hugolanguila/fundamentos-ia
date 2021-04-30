@@ -5,6 +5,9 @@
 ;;;    Un estado se representa como un arreglo con 2 elementos #(X Y) que denota la posicion actual 
 ;;;    X -> fila
 ;;;    Y -> columna
+;;;
+;;; Dadas las restricciones del problema, si es posible que se creen estados que no son validos,
+;;; sin embargo, estos estados se descartan por completo en una sola funcion.
 ;;; 
 ;;; Hernandez Escudero Luis Hugo
 (load "maze_lib.lisp")
@@ -17,6 +20,7 @@
 (defparameter *xMeta* nil)
 (defparameter *yMeta* nil)
 
+;;; Lista de posibles operadores a ser aplicados.
 (defvar *operadores* '((:norte    0)
 		       (:noreste  1)
 		       (:este     2)
@@ -56,16 +60,38 @@
 	  ((eql metodo :sin-orden)
 	   (push nodo *frontera*)))))
 
+;;; Toma de la frontera de busqueda el siguiente nodo con el estado a ser evaluado
+;;; Esta funcion solo es invocada en el algoritmo de busqueda-en-profundidad
 (defun sacar-de-frontera ()
   (pop *frontera*))
 
+;;; Funcion que evalua si es posible aplicar el [operador] al [estado]
+;;; Los operadores son movimientos que se aplican al estado actual y que producen un nuevo estado.
+;;; Solo bajo ciertas circunstancias es posible aplicar ciertos operadores.
+;;; 
+;;; En esta funcion se utiliza el predicado """(logbitp posicion entero)""" que evalua si un [entero],
+;;; en su representacion binaria, tiene un bit 1 en la [posicion], retorna T en caso de tenerlo y nil en caso 
+;;; contrario. Por esa razon es de mucha utilidad teniendo en cuenta que las paredes de todas las celdas
+;;; del laberinto se representan como un entero de 4 bits.
+;;;
+;;; Las evaluaciones se ejecutan en el siguiente orden:
+;;; 
+;;; Se verifica que la celda siguiente se encuentre dentro de los limites del laberinto
+
+;;;    En caso de cumplir esta restriccion    
+;;;        Se verifica que la celda actual no tenga ninguna pared que impida el movimiento y que 
+;;;        la celda siguiente tampoco tenga una pared que impida el movimiento.
+;;;        Si se cumplen estas condiciones, se retorna t y si no se retorna nil.
+
+;;;    En caso de no cumplirla
+;;;        No es posible aplicar el operador y se regresa nil
 (defun operador-valido? (operador estado)
   (let* ((fila (aref estado 0))
 	 (columna (aref estado 1))
 	 (celda_actual (get-cell-walls fila columna))
 	 (celda_siguiente nil)
 	 (tamanio_laberinto (array-dimensions (get-maze-data))))
-    (case (first operador)
+    (case (first operador) 
       (:norte
        (cond ((>= (1- fila) 0)
 	      (setq celda_siguiente (get-cell-walls (1- fila) columna))
@@ -121,7 +147,7 @@
       (T nil))))
 
 ;;; Crea un nuevo estado a partir del [estado] y el [operador]
-;;; El operador determina la posicion del estado a crear.
+;;; El operador determina la direccion en la que se movera el agente en el laberinto.
 (defun aplicar-operador (operador estado)
   (let* ((fila (aref estado 0))
 	 (columna (aref estado 1)))
@@ -145,7 +171,7 @@
       (T nil))))
 
 ;;; Expande un estado al aplicarle todos los operadores 
-;;; disponibles y validos
+;;; disponibles y validos.
 (defun expandir-estado ( estado )
   (let ((descendientes nil)
 	(nuevo_estado nil))
@@ -181,6 +207,8 @@
 	     (setq nodo_actual (localizar-nodo (fourth nodo_actual) *memoria*))))
     *solucion*))
 
+;;; A partir de la [lista_nodos] se construye la lista de movimientos que permiten 
+;;; llegar desde el [estado inicial] hasta el [estado meta].
 (defun crear-lista-movimientos (lista_nodos)
   (let ((nodo nil)
 	(solucion nil))
@@ -189,14 +217,13 @@
       (if (/= i 0)
 	  (setq solucion (append solucion (list (second (third nodo)))))))))
 
+;;; Inicializa las variables que seran empleadas en la busqueda de la solucion.
 (defun inicializar ()
   (setq *frontera* nil)
   (setq *memoria* nil)
   (setq *id* 0)
   (setq *ancestro_actual* nil)
-  (setq *solucion* nil)
-  (setq *xMeta* nil)
-  (setq *yMeta* nil))
+  (setq *solucion* nil))
 
 (add-algorithm 'busqueda-en-profundidad)
 (add-algorithm 'mejor-aptitud)
@@ -271,10 +298,12 @@
 
 ;;; Calcula la aptitud de un estado, considerando la distancia manhatan 
 ;;; entre la posicion del [estado] y la posicion del [estado_meta].
-(defun calcular-aptitud (estado)
-  (let ((xi (aref estado 0))
-	(yi (aref estado 1)))
-    (+ (abs (- xi *xMeta*)) (abs (- yi *yMeta*)))))
+(defun calcular-aptitud (estado estado_meta)
+  (let ((xActual (aref estado 0))
+	(yActual (aref estado 1))
+	(xMeta (aref estado_meta 0))
+	(yMeta (aref estado_meta 1)))
+    (+ (abs (- xActual xMeta)) (abs (- yActual yMeta)))))
 
 (defun mejor-aptitud()
   (inicializar)
@@ -285,8 +314,6 @@
 	(operador nil)
 	(meta_encontrada nil)
 	(solucion nil))
-    (setq *xMeta* (aref *goal* 0))
-    (setq *yMeta* (aref *goal* 1))
     (agregar-a-frontera *start* nil ':sin-orden 0)
     (loop until (or meta_encontrada (null *frontera*)) do
 	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
@@ -303,7 +330,7 @@
 		   (setq sucesores (expandir-estado estado))
 		   (setq sucesores (filtro-mejor-aptitud sucesores))
 		   (loop for sucesor in sucesores do
-			 (setq aptitud (calcular-aptitud (first sucesor)))
+			 (setq aptitud (calcular-aptitud (first sucesor) *goal*))
 			 (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden aptitud)))))))
 
 ;(mejor-aptitud)
@@ -333,8 +360,6 @@
 	(meta_encontrada nil)
 	(solucion nil)
 	(costo_real nil))
-    (setq *xMeta* (aref *goal* 0))
-    (setq *yMeta* (aref *goal* 1))
     (agregar-a-frontera *start* nil ':sin-orden 0)
     (loop until (or meta_encontrada (null *frontera*)) do
 	  (setq nodo (sacar-nodo-con-mejor-evaluacion))
@@ -351,7 +376,7 @@
 		   (setq sucesores (expandir-estado estado))
 		   (setq sucesores (filtrar-estados-recordados sucesores))
 		   (loop for sucesor in sucesores do
-			 (setq costo_real (+ *ancestro_actual* (calcular-aptitud (first sucesor))))
+			 (setq costo_real (+ *ancestro_actual* (calcular-aptitud (first sucesor) *goal*)))
 			 (if (pasa-filtro-a-estrella? (first sucesor) costo_real)
 			     (agregar-a-frontera (first sucesor) (second sucesor) ':sin-orden costo_real))))))))
 
